@@ -62,12 +62,17 @@ module Supply
       when "service_account"
         auth_client = Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: service_account_json, scope: self.class::SCOPE)
       else
-        UI.user_error!("Invalid Google Credentials file provided - no credential type found.")
+        # try using ADC
+        begin
+          auth_client = Google::Auth.get_application_default(scope: self.class::SCOPE)
+        rescue => e
+          UI.user_error!("Invalid Google Credentials file provided or application default credentials not found: #{e.message}")
+        end
       end
 
       UI.verbose("Fetching a new access token from Google...")
 
-      auth_client.fetch_access_token!
+      auth_client.fetch_access_token! unless auth_client.is_a?(Google::Auth::ImpersonatedServiceAccountCredentials)
 
       if FastlaneCore::Env.truthy?("DEBUG")
         Google::Apis.logger.level = Logger::DEBUG
